@@ -69,11 +69,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			return m, tea.Quit
 
-		case "ctrl+g":
-			m.install = !m.install
+		case "g":
+			m.install = true
 
 		case "esc":
 			if m.install {
@@ -105,7 +105,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if m.install {
 		var cmd tea.Cmd
-		m.installInput, cmd = m.installInput.Update(msg)
+		if m.installInput.Focused() {
+			updateListContent(&m)
+			m.installInput, cmd = m.installInput.Update(msg)
+		} else {
+			m.packageList, cmd = m.packageList.Update(msg)
+		}
 		return m, cmd
 	} else if m.rendered {
 		var cmd tea.Cmd
@@ -140,14 +145,8 @@ func (m model) View() string {
 	parsedString = fmt.Sprintf("%v\n%v", projectVersion, m.ptable.View())
 
 	if m.install {
-		var filter = filterGolangPackages(m.installInput.Value())
-		var listItems []list.Item
 
-		for _, f := range filter {
-			listItems = append(listItems, packageListItem{title: f.Path})
-		}
 		m.packageList.SetSize(m.window.width-5, m.window.height/2)
-		m.packageList.SetItems(listItems)
 		m.installInput.Width = m.window.width
 		var input = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -161,7 +160,7 @@ func (m model) View() string {
 			Border(lipgloss.RoundedBorder()).
 			Align(lipgloss.Center).
 			Render(func() string {
-				if len(filter) > 0 && len(m.installInput.Value()) > 0 {
+				if len(m.packageList.Items()) > 0 && len(m.installInput.Value()) > 0 {
 					return m.packageList.View()
 				}
 
@@ -171,6 +170,16 @@ func (m model) View() string {
 	}
 
 	return parsedString
+}
+
+func updateListContent(m *model) {
+	var filter = filterGolangPackages(m.installInput.Value())
+	var listItems []list.Item
+
+	for _, f := range filter {
+		listItems = append(listItems, packageListItem{title: f.Path})
+	}
+	m.packageList.SetItems(listItems)
 }
 
 func drawTable(m *model, fmod gomod) {
